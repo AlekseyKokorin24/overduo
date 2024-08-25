@@ -1,22 +1,31 @@
 import asyncio
 import logging
 
-from aiogram.fsm.context import FSMContext
-from aiogram.fsm.state import default_state, State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 from config_data.config import load_config
 from aiogram import Bot, Dispatcher
 from handlers import user_handlers
 
+import sqlite3
+
+def connection():
+    conn =sqlite3.connect('overduo.db')
+    cursor = conn.execute('SELECT shop_id FROM users')
+    cursor = cursor.fetchall()
+    PRIMARY_KEYS = set()
+    for i in cursor:
+        PRIMARY_KEYS.add(i[0])
+    print(PRIMARY_KEYS)
+    return PRIMARY_KEYS
 
 config = load_config()
+
 BOT_TOKEN = config.tg_bot.token
 ADMIN_IDS = config.tg_bot.admin_ids
-PRIMARY_KEYS = config.tg_bot.PRIMARY_KEYS
+PRIMARY_KEYS = connection()
 bot = Bot(BOT_TOKEN)
 storage = MemoryStorage()
 dp = Dispatcher(storage=storage)
-
 
 
 logger = logging.getLogger(__name__) 

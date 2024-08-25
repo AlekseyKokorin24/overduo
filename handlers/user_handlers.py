@@ -7,15 +7,16 @@ from aiogram.fsm.state import default_state, State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 
 from other_func import connect, create_pimary_keys
-from main import PRIMARY_KEYS
+from main import connection
 from FSM_state import FSM_FORM
 
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery, PhotoSize
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery, PhotoSize, FSInputFile
 from aiogram.utils.keyboard import ReplyKeyboardBuilder
 
-import aiosqlite, asyncio, logging, os
+import logging
 from keyboard import *
-from main import bot
+from main import bot, PRIMARY_KEYS
+
 
 router = Router()
 
@@ -23,11 +24,6 @@ router = Router()
 @router.message(CommandStart(), StateFilter(default_state))
 async def process_start_bot(message: Message):
     keyboard = InlineKeyboardMarkup(inline_keyboard=[[enter], [create]])
-    id_users = message.from_user.id
-    users = await connect(typeActions='check_in')
-    if id_users not in users:
-        await connect(typeActions='add_user', user_id=id_users)
-
     await message.answer(text='Привет, говно', reply_markup=keyboard)
     await bot.delete_message(chat_id=message.chat.id, message_id=message.message_id - 1)
 
@@ -50,7 +46,7 @@ async def process_cancel(calback: CallbackQuery, state: FSMContext):
 async def process_enter_shop_id(callback: CallbackQuery):
     keyboard = InlineKeyboardMarkup(inline_keyboard=[[enter]])
     key = create_pimary_keys()
-    await connect(typeActions='create_shop', shop_id=str(key), user_id=int(callback.message.from_user.id))
+    await connect(typeActions='create_shop', shop_id=key, user_id=callback.message.from_user.id)
     await callback.message.edit_text(f'Вот ваш уникальный id магазина - {key}\nЗапонимните его, потому что сейчас удалися', reply_markup=keyboard)
     
 # Вход в БД в дефолтном состоянии
@@ -67,14 +63,13 @@ async def warning_enter(callback: CallbackQuery):
     await callback.message.answer('Вы уже находитесь в БД\nСначала нужно выйти', reply_markup=keyboard)
     
 # Ожидание ввода кода магазина
-@router.message((StateFilter(FSM_FORM.stateWaitingShopId) or StateFilter(FSM_FORM.stateBeingInDB)), F.text.in_(PRIMARY_KEYS))
+@router.message(StateFilter(FSM_FORM.stateWaitingShopId), F.text.in_(PRIMARY_KEYS))  # Delete StateFilter(FSM_FORM.stateBeingInDB)
 async def process_set_shop_id(message: Message, state: FSMContext):
-    # await connect(bd='overduo.db', typeActions='create_shop',shop_id=message.text, user_id=message.from_user.id)
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[[add_product_btn], [del_product_btn], [exit_DB]])
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[[add_product_btn], [del_product_btn], [exit_DB], [show_products_btn]])
     await bot.delete_message(chat_id=message.chat.id, message_id=message.message_id - 1)
     await bot.delete_message(chat_id=message.chat.id, message_id=message.message_id)
+    await connect(typeActions='enter_shop', shop_id=message.text, user_id=message.from_user.id)
     await message.answer('Поздравляю, вы вошли💦', reply_markup=keyboard)
-    # await state.set_state(FSM_FORM.state_shop_id)
     await state.set_state(FSM_FORM.stateBeingInDB)
 
 # Ошибка входа
@@ -89,8 +84,8 @@ async def warning(message: Message):
 @router.callback_query(F.data == 'exit', ~StateFilter(default_state))
 async def process_exit(calback: CallbackQuery, state: FSMContext):
     keyboard = InlineKeyboardMarkup(inline_keyboard=[[enter], [create]])
-    await calback.message.edit_text('Выполнен выход из БД', reply_markup=keyboard)
     await connect(typeActions='exit_db', user_id=calback.message.from_user.id)
+    await calback.message.edit_text('Выполнен выход из БД', reply_markup=keyboard)
     await state.clear()
 
 # Показать список магазинов
@@ -125,14 +120,12 @@ async def process_set_photo_product(message: Message, state: FSMContext, largest
     await message.answer('Красава, товар добавлен', reply_markup=keyboard)
     await state.set_state(FSM_FORM.stateBeingInDB)
 
-# В разработке
+# Показывает все продукты, которые нахоядятся в БД
 @router.callback_query(StateFilter(FSM_FORM.stateBeingInDB), F.data == 'show_prd')
 async def show_products(callback: CallbackQuery):
-    info_product = await connect(typeActions='show_products', user_id=int(callback.message.from_user.id))
+    info_product = await connect(typeActions='show_products', user_id=callback.from_user.id)
     for i in info_product:
-        await callback.message.answer(f'{str(i[0])}, {str(i[1])}, {str(i[2])}')
-
-# @router.message(Command(commands='clear_key'))
-# async def clear_key(message: Message):
-#     await connect(typeActions='clear')
-#     await message.answer('База очищена')
+        photo = FSInputFile(f'shops/{str(i[0])}/{str(i[1])}.jpg')
+        await callback.message.answer_photo(photo=photo, caption=f'Код товара: {i[1]}\nСрок годности до: {i[2]}')
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[[add_product_btn], [del_product_btn], [exit_DB], [show_products_btn]])
+    await callback.message.answer(text='Продолжим', reply_markup=keyboard)

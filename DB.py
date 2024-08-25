@@ -19,13 +19,6 @@ async def main():
                            data TEXT,
                            FOREIGN KEY (shop_id) REFERENCES users (shop_id) ON DELETE CASCADE)
                            ''')
-        
-        await conn.execute('''
-                        CREATE TABLE IF NOT EXISTS shops(
-                           id INTEGER PRIMARY KEY,
-                           shop_id TEXT,
-                           FOREIGN KEY (shop_id) REFERENCES users (shop_id) ON DELETE CASCADE)
-                           ''')
         await conn.commit()
     
 asyncio.run(main())

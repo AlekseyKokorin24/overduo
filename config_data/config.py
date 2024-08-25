@@ -7,7 +7,6 @@ from dataclasses import dataclass
 class TgBot:
     token: str
     admin_ids: list[int]
-    PRIMARY_KEYS: set[str]
  
 @dataclass
 class Config:
@@ -18,8 +17,7 @@ def load_config() -> Config:
     return Config(
         tg_bot=TgBot(
             token=os.getenv('BOT_TOKEN_OVERDUE'),
-            admin_ids=list(map(int, os.getenv('ADMIN_IDS').split())),
-            PRIMARY_KEYS=set()
+            admin_ids=list(map(int, os.getenv('ADMIN_IDS').split()))
         )
     )
 
