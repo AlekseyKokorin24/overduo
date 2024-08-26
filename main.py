@@ -5,6 +5,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from config_data.config import load_config
 from aiogram import Bot, Dispatcher
 from handlers import user_handlers
+from aiogram.types import BotCommand
 
 import sqlite3
 
@@ -36,11 +37,19 @@ formatter = logging.Formatter('[{asctime}] #{levelname} {filename}:{lineno} - {m
 handler.setFormatter(formatter)
 logger.addHandler(handler)
 
+async def set_main_menu(bot: Bot):
+    main_menu_commands = [
+        BotCommand(command='/start',
+                   description='Запускаем бота')
+    ]
+
+    await bot.set_my_commands(main_menu_commands)
+    
 async def main():
     dp.include_router(user_handlers.router)
     await bot.delete_webhook(drop_pending_updates=True)
-
-    await dp.start_polling(bot)
+    dp.startup.register(set_main_menu)
+    await dp.start_polling(bot) 
     logger.info('start polling')
 
 if __name__ == '__main__':
