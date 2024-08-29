@@ -16,7 +16,6 @@ def connection():
     PRIMARY_KEYS = set()
     for i in cursor:
         PRIMARY_KEYS.add(i[0])
-    print(PRIMARY_KEYS)
     return PRIMARY_KEYS
 
 config = load_config()

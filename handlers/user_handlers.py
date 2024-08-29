@@ -6,8 +6,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import default_state, State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 
-from other_func import connect, create_pimary_keys
-from main import connection
+from other_func import connect, create_pimary_keys, calculate_func
 from FSM_state import FSM_FORM
 
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery, PhotoSize, FSInputFile
@@ -16,8 +15,6 @@ from aiogram.utils.keyboard import ReplyKeyboardBuilder
 import logging
 from keyboard import *
 from main import bot, PRIMARY_KEYS
-
-from datetime import datetime
 
 router = Router()
 
@@ -53,12 +50,6 @@ async def process_enter_shop(callback: CallbackQuery, state: FSMContext):
     keyboard = InlineKeyboardMarkup(inline_keyboard=[[cancel_btn]])
     await callback.message.edit_text('Пожалуйста, введите id магазина', reply_markup=keyboard)
     await state.set_state(FSM_FORM.stateWaitingShopId)
-
-# Нажатие на копку "ВОЙТИ" в состоянии нахождения в БД, Но пока нет возможности вызова данной функции
-# @router.callback_query(F.data == 'enterCD', StateFilter(FSM_FORM.stateBeingInDB))
-# async def warning_enter(callback: CallbackQuery):
-#     keyboard = InlineKeyboardMarkup(inline_keyboard=[[exit_DB_btn], [cancel_btn]])
-#     await callback.message.answer('Вы уже находитесь в БД\nСначала нужно выйти', reply_markup=keyboard)
     
 # Ожидание ввода кода магазина
 @router.message(StateFilter(FSM_FORM.stateWaitingShopId), F.text.in_(PRIMARY_KEYS))  # Delete StateFilter(FSM_FORM.stateBeingInDB)
@@ -126,13 +117,36 @@ async def show_products(callback: CallbackQuery):
         await callback.message.edit_text(text='Товаров пока нет')
     await callback.message.answer(text='Продолжим', reply_markup=in_db_keyboard)
 
+# Показывает товары, у которых срок годности выходит в течение 3 дней
 @router.callback_query(StateFilter(FSM_FORM.stateBeingInDB), F.data == 'button_3_daysCD')
 async def overduo_3_days(callback: CallbackQuery):
     fit_date = await connect(typeActions='enter_3_days_TA', user_id=callback.from_user.id)
+    # await bot.delete_message(chat_id=message.chat.id, message_id=message.message_id - 1)
     if fit_date:
         for i in fit_date:
             photo = FSInputFile(f"shops/{str(i[0])}/{str(i[1])}.jpg")
             await callback.message.answer_photo(photo=photo, caption=f'Код товара {i[1]}')
+        await callback.message.answer(text='Продолжим', reply_markup=in_db_keyboard)
     else:
         await callback.message.answer(text="Нет подходящих дат", reply_markup=in_db_keyboard)
-    await callback.message.answer(text='Продолжим', reply_markup=in_db_keyboard)
+
+@router.callback_query(StateFilter(FSM_FORM.stateBeingInDB), F.data == 'del_improper_productsCD')
+async def del_improper_products(callback: CallbackQuery):
+    await connect(typeActions='del_improper_products_TA', user_id=callback.from_user.id)
+    await callback.message.edit_text(text='Все лишние файлы удалены', reply_markup=in_db_keyboard)
+
+
+@router.callback_query(F.data == 'calculationCD', StateFilter(FSM_FORM.stateBeingInDB))
+async def wait_calculate(callback: CallbackQuery, state: FSMContext):
+    await callback.message.edit_text('Введите через прбел дату изготовления, срок годности и формат расчета (д/м/г)')
+    await state.set_state(FSM_FORM.stateCalculate)
+
+@router.message(StateFilter(FSM_FORM.stateCalculate))
+async def calculate(message: Message, state: FSMContext):
+    await bot.delete_message(chat_id=message.chat.id, message_id=message.message_id - 1)
+    await bot.delete_message(chat_id=message.chat.id, message_id=message.message_id)
+    date_create, num, form = message.text.split()
+    new_date = calculate_func(date_create, int(num), form)
+    await message.answer(f"Товар годен до {str(new_date)}",reply_markup=in_db_keyboard)
+    await state.set_state(FSM_FORM.stateBeingInDB)
+
