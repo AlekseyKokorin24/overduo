@@ -1,7 +1,7 @@
 import asyncio
 import logging
 
-from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.fsm.storage.redis import RedisStorage, Redis
 from config_data.config import load_config
 from aiogram import Bot, Dispatcher
 from handlers import user_handlers
@@ -23,8 +23,9 @@ config = load_config()
 BOT_TOKEN = config.tg_bot.token
 ADMIN_IDS = config.tg_bot.admin_ids
 PRIMARY_KEYS = connection()
+redis = Redis(host='localhost')
 bot = Bot(BOT_TOKEN)
-storage = MemoryStorage()
+storage = RedisStorage(redis=redis)
 dp = Dispatcher(storage=storage)
 
 

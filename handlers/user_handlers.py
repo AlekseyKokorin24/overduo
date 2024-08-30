@@ -4,7 +4,7 @@ from aiogram.filters import Command, CommandStart, StateFilter
 
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import default_state, State, StatesGroup
-from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.fsm.storage.redis import RedisStorage, Redis
 
 from other_func import connect, create_pimary_keys, calculate_func
 from FSM_state import FSM_FORM
@@ -27,7 +27,7 @@ async def process_start_bot(message: Message):
 # Запуск бота НЕ в дефолтном состоянии
 @router.message(CommandStart(), ~StateFilter(default_state))
 async def process_start_bot(message: Message):
-    await message.answer(text='Выбирай, говно', reply_markup=enter_create_or_cancel_keyboard)
+    await message.answer(text='Выбирай, говно', reply_markup=in_db_keyboard)
     await bot.delete_message(chat_id=message.chat.id, message_id=message.message_id - 1)
 
 # Отмена входа
