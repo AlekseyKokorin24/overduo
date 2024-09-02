@@ -6,25 +6,27 @@ import os
 import datetime as dt
 from dateutil.relativedelta import relativedelta
 # Другие модули
-import random,  re
+import random, re
 # Переменные из других файлов 
 from main import PRIMARY_KEYS
 
 # Выбор элементов с неправильным форматом даты
-def select_improper_date(date: str):
-    pattern = re.compile(r'\d\d.\d\d.\d\d\d\d')
+def select_improper_date(date):
+    pattern = re.compile(r'\d\d\.\d\d\.\d\d\d\d')
     if pattern.search(date) is None:
         return True
 
 # Функция расчета срока годности
 def calculate_func(date_create: str, num: int, form: str):
-    d1 = dt.datetime.strptime(date_create, '%d.%m.%Y')
-    if form == 'м':
-        new_date = d1 + relativedelta(months=num)
-    if form == 'д':
-        new_date = d1 + dt.timedelta(days=num)
-    return dt.datetime.strftime(new_date, '%d-%m-%Y')
-
+    try:
+        d1 = dt.datetime.strptime(date_create, '%d.%m.%Y')
+        if form == 'м':
+            new_date = d1 + relativedelta(months=num)
+        if form == 'д':
+            new_date = d1 + dt.timedelta(days=num)
+        return dt.datetime.strftime(new_date, '%d-%m-%Y')
+    except:
+        return False
 # Функция выбора товаров, с исходящим сроком годнсти в течение 3 дней
 def select_3_days(date: str):
     if len(date) < 10:
@@ -45,7 +47,7 @@ def create_pimary_keys():
         return key
     
 # Основная функция работы с БД
-async def connect(typeActions=None, user_id=None, shop_id=None, downloaded_file=None, cod_product=None, data_product=None):
+async def connect(typeActions=None, user_id=None, shop_id=None, downloaded_file=None, cod_product=None, data_product=None, name_product=None):
     conn = await aiosqlite.connect('overduo.db') # Подключение в БД
 
     # При создании магазина добавляется shop_id магазина в таблицу users
@@ -86,7 +88,7 @@ async def connect(typeActions=None, user_id=None, shop_id=None, downloaded_file=
         cursor = await cursor.fetchone()
         async with aiofiles.open(f'shops/{str(cursor[0])}/{cod_product}.jpg', 'wb') as file:
             await file.write(downloaded_file.getvalue())
-        await conn.execute('INSERT INTO products (shop_id, cod, data) VALUES (?, ?, ?)', (cursor[0], cod_product, data_product))
+        await conn.execute('INSERT INTO products (shop_id, cod, data, name_product) VALUES (?, ?, ?, ?)', (cursor[0], cod_product, data_product), name_product)
 
     # Для алминистратора бота, очищает список магазинов 
     if typeActions == 'clear_TA':
@@ -104,16 +106,19 @@ async def connect(typeActions=None, user_id=None, shop_id=None, downloaded_file=
     if typeActions == 'del_improper_products_TA': 
         cursor = await conn.execute("SELECT shop_id FROM users WHERE user_id = (?)", (user_id, ))
         cursor = await cursor.fetchone()
-    
         cursor = await conn.execute('SELECT * FROM products WHERE shop_id = (?)', (cursor[0], ))
         cursor = await cursor.fetchall()
-        list_improper_date = [i for i in cursor if select_improper_date(i[2])]
-        for i in list_improper_date:
-            print('Вот дата товара:', i[2])
-            await conn.execute('DELETE FROM products WHERE data = (?)', (i[2], ))
-            file_name = f'shops/{str(i[0])}/{str(i[1])}.jpg'
-            os.remove(file_name)
-
+        for i in cursor:
+            if select_improper_date(i[2]):
+                await conn.execute('DELETE FROM products WHERE data = (?)', (i[2], ))
+                file_name = f'shops/{str(i[0])}/{str(i[1])}.jpg'
+                os.remove(file_name)
+    
+    if typeActions == 'del_products_TA':
+        try:
+            await conn.execute("DELETE FROM products WHERE cod = (?)", (cod_product, ))
+        except:
+            return False
     await conn.commit()
     await conn.close() 
 

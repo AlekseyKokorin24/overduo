@@ -6,3 +6,4 @@ class FSM_FORM(StatesGroup):
     stateBeingInDB = State() # Состояниек нахождения в БД
     stateWaitingInfoProducts = State()   # Состояние ожидания отправки фото, кода и годности
     stateCalculate = State() # Состояние ожидания ррасчета срока годности
+    stateWaitingDeleteProducts = State()

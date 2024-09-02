@@ -1,6 +1,7 @@
 import asyncio
 import logging
 
+from aiogram.client.default import DefaultBotProperties
 from aiogram.fsm.storage.redis import RedisStorage, Redis
 from config_data.config import load_config
 from aiogram import Bot, Dispatcher
@@ -24,7 +25,7 @@ BOT_TOKEN = config.tg_bot.token
 ADMIN_IDS = config.tg_bot.admin_ids
 PRIMARY_KEYS = connection()
 redis = Redis(host='localhost')
-bot = Bot(BOT_TOKEN)
+bot = Bot(BOT_TOKEN, default=DefaultBotProperties(parse_mode='HTML'))
 storage = RedisStorage(redis=redis)
 dp = Dispatcher(storage=storage)
 
@@ -53,4 +54,5 @@ async def main():
     logger.info('start polling')
 
 if __name__ == '__main__':
+    logger.info('start polling')
     asyncio.run(main())

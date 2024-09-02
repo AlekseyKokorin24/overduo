@@ -17,6 +17,7 @@ async def main():
                            shop_id TEXT NOT NULL,
                            cod INTEGER,
                            data TEXT,
+                           name_product TEXT,
                            FOREIGN KEY (shop_id) REFERENCES users (shop_id) ON DELETE CASCADE)
                            ''')
         await conn.commit()
