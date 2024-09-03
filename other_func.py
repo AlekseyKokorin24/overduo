@@ -9,6 +9,7 @@ from dateutil.relativedelta import relativedelta
 import random, re
 # Переменные из других файлов 
 from main import PRIMARY_KEYS
+from main import bot
 
 # Выбор элементов с неправильным форматом даты
 def select_improper_date(date):
@@ -74,9 +75,26 @@ async def connect(typeActions=None, user_id=None, shop_id=None, downloaded_file=
     if typeActions == 'show_products_TA':
         cursor = await conn.execute("SELECT shop_id FROM users WHERE user_id = (?)", (user_id, ))
         cursor = await cursor.fetchone()
-        info_product = await conn.execute("SELECT * FROM products WHERE shop_id = (?)", (str(cursor[0]), ))
-        info_product = await info_product.fetchall()
-        return info_product
+        info_products = await conn.execute("SELECT * FROM products WHERE shop_id = (?)", (str(cursor[0]), ))
+        info_products = await info_products.fetchall()
+        result = []
+        res = []
+        count = 1
+        for product in info_products:
+            string = f'{product[3]}, Код: {str(product[1])}, Годен до: {product[2]}'
+            res.append(string)
+            count += 1
+            if count % 7 == 0:
+                result.append('\n'.join(res))
+                res = []
+                count += 1
+        
+        result.append('\n'.join(res)) if res else None
+        user_dict = {key: value for key, value in enumerate(result, start=1)}
+        lenth = len(user_dict)
+        user_dict['page'] = 1
+        user_dict['lenth'] = lenth
+        return user_dict
     
     # Для администратора бота, показывает все магазины
     if typeActions == 'show_TA':
@@ -88,7 +106,7 @@ async def connect(typeActions=None, user_id=None, shop_id=None, downloaded_file=
         cursor = await cursor.fetchone()
         async with aiofiles.open(f'shops/{str(cursor[0])}/{cod_product}.jpg', 'wb') as file:
             await file.write(downloaded_file.getvalue())
-        await conn.execute('INSERT INTO products (shop_id, cod, data, name_product) VALUES (?, ?, ?, ?)', (cursor[0], cod_product, data_product), name_product)
+        await conn.execute('INSERT INTO products (shop_id, cod, data, name_product) VALUES (?, ?, ?, ?)', (cursor[0], cod_product, data_product, name_product))
 
     # Для алминистратора бота, очищает список магазинов 
     if typeActions == 'clear_TA':
@@ -115,8 +133,10 @@ async def connect(typeActions=None, user_id=None, shop_id=None, downloaded_file=
                 os.remove(file_name)
     
     if typeActions == 'del_products_TA':
+        cursor = await conn.execute("SELECT cod FROM products WHERE cod = (?)", (cod_product, ))
+        cursor = await cursor.fetchone()
         try:
-            await conn.execute("DELETE FROM products WHERE cod = (?)", (cod_product, ))
+            await conn.execute("DELETE FROM products WHERE cod = (?)", (cursor[0], ))
         except:
             return False
     await conn.commit()

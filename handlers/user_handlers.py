@@ -17,10 +17,16 @@ from main import bot, PRIMARY_KEYS
 import re
 router = Router()
 
+user_db = {}
+
+@router.message(Command('clear_state'))
+async def clear_state(message: Message, state: FSMContext):
+    await state.clear()
+    await message.answer('FSM is clear')
 # Запуск бота в дефолтном состоянии
 @router.message(CommandStart(), StateFilter(default_state))
 async def process_start_bot(message: Message):
-    await message.answer(text=f'Привет,{message.from_user.first_name}.\nЗдесь ты можешь хранить информацию о товарах:\n-Срок годности\n-Фото\n-Код-фрагмент\n-Название товара\nНо для начала нужно войти или создать БД', reply_markup=enter_or_create_keyboard)
+    await message.answer(text=f'<b>{message.from_user.first_name}</b>, привет.\n\nЗдесь ты можешь хранить информацию о товарах:\n-Срок годности\n-Фото\n-Код-фрагмент\n-Название товара\n\nНо для начала нужно войти или создать БД', reply_markup=enter_or_create_keyboard)
     await bot.delete_message(chat_id=message.chat.id, message_id=message.message_id - 1)
 
 # Запуск бота НЕ в дефолтном состоянии
@@ -41,13 +47,13 @@ async def process_enter_shop_id(callback: CallbackQuery):
     keyboard = InlineKeyboardMarkup(inline_keyboard=[[enter_btn]])
     key = create_pimary_keys()
     await connect(typeActions='create_shop_TA', shop_id=key, user_id=callback.message.from_user.id)
-    await callback.message.edit_text(f'Вот твой уникальный id магазина - `{key}`\nЗапонимни его, потому что сейчас он удалися', reply_markup=keyboard)
+    await callback.message.edit_text(f'Вот твой уникальный <b>id</b> магазина - <b>{key}</b>\nЗапонимни его, потому что сейчас он удалися', reply_markup=keyboard)
     
 # Вход в БД в дефолтном состоянии
 @router.callback_query(F.data == 'enterCD', StateFilter(default_state))
 async def process_enter_shop(callback: CallbackQuery, state: FSMContext):
     keyboard = InlineKeyboardMarkup(inline_keyboard=[[cancel_btn]])
-    await callback.message.edit_text('Введи id магазина для входа', reply_markup=keyboard)
+    await callback.message.edit_text('Введи <b>id</b> магазина для входа', reply_markup=keyboard)
     await state.set_state(FSM_FORM.stateWaitingShopId)
     
 # Ожидание ввода кода магазина
@@ -83,7 +89,7 @@ async def show(message: Message):
 # Добавить товар в состоянии нахождения в БД
 @router.callback_query(F.data == 'add_prdCD', StateFilter(FSM_FORM.stateBeingInDB))
 async def add_product(calback: CallbackQuery, state: FSMContext):
-    await calback.message.edit_text('Пожалуйста, отправь фото товара\nВ описании к нему отправь:\n\n1. Код-фрагмент\n2. Дату, до которого товар годен\n  <b>В формате ДД.ММ.ГГГГ</b>\n3. название товара(опицонально)')
+    await calback.message.edit_text('Пожалуйста, отправь фото товара.\n\nВ описании к нему отправь:\n1. Код-фрагмент\n2. Дату, до которого товар годен\n  <b>В формате ДД.ММ.ГГГГ</b>\n3. название товара(опицонально)')
     await state.set_state(FSM_FORM.stateWaitingInfoProducts)
 
 # Проверяет, что отправлено фото, дата соответствует формату и добавялет товар в БД
@@ -92,11 +98,11 @@ async def process_set_photo_product(message: Message, state: FSMContext, largest
     photo_id = message.photo[-1].file_id
     file_info = await bot.get_file(photo_id)
     downloaded_file = await bot.download_file(file_info.file_path)
-    caption = message.split()
-    cod_product = caption[0]
-    date_poduct = caption[1]
-    name_product = caption[2]
     try:
+        caption = message.caption.split()
+        cod_product = caption[0]
+        date_poduct = caption[1]
+        name_product = caption[2]
         datetime.datetime.strptime(date_poduct, "%d.%m.%Y")
         await connect(typeActions='add_product_TA', downloaded_file=downloaded_file, cod_product=cod_product, data_product=date_poduct, user_id=message.from_user.id, name_product=name_product)
         await bot.delete_message(chat_id=message.chat.id, message_id=message.message_id - 1)
@@ -105,12 +111,12 @@ async def process_set_photo_product(message: Message, state: FSMContext, largest
             photo_id=largest_photo.file_id
             )
         await bot.delete_message(chat_id=message.chat.id, message_id=message.message_id)
-        await message.answer('Красава, товар добавлен в БД твоего магазина', reply_markup=in_db_keyboard)
+        await message.answer('<b>Красава</b>, товар добавлен в БД твоего магазина', reply_markup=in_db_keyboard)
         await state.set_state(FSM_FORM.stateBeingInDB)
     except:
         await bot.delete_message(chat_id=message.chat.id, message_id=message.message_id - 1)
         await state.set_state(FSM_FORM.stateBeingInDB)
-        await message.answer('Введен неправильный формат даты\nПопробуй еще раз\nИли отмени', reply_markup=in_db_keyboard)
+        await message.answer('Произошла оишбка\nПроверь правильность введенных данных.', reply_markup=in_db_keyboard)
 
 @router.message(StateFilter(FSM_FORM.stateWaitingInfoProducts))
 async def wrang_set_photo_products(message: Message, state: FSMContext):
@@ -121,15 +127,44 @@ async def wrang_set_photo_products(message: Message, state: FSMContext):
 # Показывает все продукты, которые нахоядятся в БД
 @router.callback_query(StateFilter(FSM_FORM.stateBeingInDB), F.data == 'show_prdCD')
 async def show_products(callback: CallbackQuery):
-    info_product = await connect(typeActions='show_products_TA', user_id=callback.from_user.id)
-    if info_product:
-        for i in info_product:
-            photo = FSInputFile(f'shops/{str(i[0])}/{str(i[1])}.jpg')
-            await callback.message.answer_photo(photo=photo, caption=f'<b>Название:</b> {i[3]}\n<b>Код товара:</b> {i[1]}\n<b>Срок годности до:</b> {i[2]}')
-    else:
-        await callback.message.edit_text(text='Товаров пока нет')
-    await callback.message.answer(text='\n<b>Продолжим</b>\n', reply_markup=in_db_keyboard)
+    user_db[callback.from_user.id] = await connect(typeActions='show_products_TA', user_id=callback.from_user.id)
+    page = user_db[callback.from_user.id]['page']
+    await callback.message.edit_text(user_db[callback.from_user.id][page], reply_markup=pagination_keyboard)
 
+    # if info_product:
+    #     for i in info_product:
+    #         photo = FSInputFile(f'shops/{str(i[0])}/{str(i[1])}.jpg')
+    #         await callback.message.answer_photo(photo=photo, caption=f'<b>Название:</b> {i[3]}\n<b>Код товара:</b> {i[1]}\n<b>Срок годности до:</b> {i[2]}')
+    # else:
+    #     await callback.message.edit_text(text='Товаров пока нет')
+    # await callback.message.answer(text='\n<b>Продолжим</b>\n', reply_markup=in_db_keyboard)
+@router.callback_query(StateFilter(FSM_FORM.stateBeingInDB), F.data == 'backwardCD')
+async def process_backward_pegination(callback: CallbackQuery):
+    page = user_db[callback.from_user.id]['page'] 
+    try:
+        await callback.message.edit_text(user_db[callback.from_user.id][page-1], reply_markup=pagination_keyboard)
+        user_db[callback.from_user.id]['page'] -= 1
+    except:
+        page = user_db[callback.from_user.id]['lenth']
+        await callback.message.edit_text(user_db[callback.from_user.id][page], reply_markup=pagination_keyboard)
+        user_db[callback.from_user.id]['page'] = page
+@router.callback_query(StateFilter(FSM_FORM.stateBeingInDB), F.data == 'forwardCD')
+async def process_backward_pegination(callback: CallbackQuery):
+    page = user_db[callback.from_user.id]['page'] 
+    try:
+        if page < 10:
+            page += 1
+            await callback.message.edit_text(user_db[callback.from_user.id][page], reply_markup=pagination_keyboard)
+            user_db[callback.from_user.id]['page'] += 1
+        else:
+            await callback.message.answer('lol')
+    except:
+        user_db[callback.from_user.id]['page'] = 1
+        await callback.message.edit_text(user_db[callback.from_user.id][1], reply_markup=pagination_keyboard)
+
+@router.callback_query(F.data == 'main_menuCD')
+async def enter_main_menu_btn(callback: CallbackQuery):
+    await callback.message.edit_text('<b>Продолжим</b>', reply_markup=in_db_keyboard)
 # Показывает товары, у которых срок годности выходит в течение 3 дней
 @router.callback_query(StateFilter(FSM_FORM.stateBeingInDB), F.data == 'button_3_daysCD')
 async def overduo_3_days(callback: CallbackQuery):
@@ -138,10 +173,10 @@ async def overduo_3_days(callback: CallbackQuery):
     if fit_date:
         for i in fit_date:
             photo = FSInputFile(f"shops/{str(i[0])}/{str(i[1])}.jpg")
-            await callback.message.answer_photo(photo=photo, caption=f'Код товара: <b>{i[1]}</b>, Годен до: <b>{i[2]}</b>')
+            await callback.message.answer_photo(photo=photo, caption=f'<b>Название:</b> {i[3]}\nКод товара: <b>{i[1]}</b>, Годен до: <b>{i[2]}</b>')
         await callback.message.answer(text='<b>Продолжим</b>', reply_markup=in_db_keyboard)
     else:
-        await callback.message.answer(text="<b>Нет подходящих дат</b>", reply_markup=in_db_keyboard)
+        await callback.message.edit_text(text="<b>Нет подходящих дат</b>", reply_markup=in_db_keyboard)
 
 @router.callback_query(StateFilter(FSM_FORM.stateBeingInDB), F.data == 'del_improper_productsCD')
 async def del_improper_products(callback: CallbackQuery, state: FSMContext):

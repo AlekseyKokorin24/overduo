@@ -24,7 +24,7 @@ config = load_config()
 BOT_TOKEN = config.tg_bot.token
 ADMIN_IDS = config.tg_bot.admin_ids
 PRIMARY_KEYS = connection()
-redis = Redis(host='localhost')
+redis = Redis(host='localhost', port=6379)
 bot = Bot(BOT_TOKEN, default=DefaultBotProperties(parse_mode='HTML'))
 storage = RedisStorage(redis=redis)
 dp = Dispatcher(storage=storage)
