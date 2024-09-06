@@ -14,9 +14,10 @@ calculation_btn = InlineKeyboardButton(text='Расчитать срок год�
 forward_btn = InlineKeyboardButton(text='>>', callback_data='forwardCD')
 backward_btn = InlineKeyboardButton(text='<<', callback_data='backwardCD')
 enter_main_menu_btn = InlineKeyboardButton(text='Main menu', callback_data='main_menuCD')
+cancel_input_btn = InlineKeyboardButton(text='Cancel', callback_data='cancel_inputCD')
 
+cancel_enter_keyboard = InlineKeyboardBuilder().row(cancel_input_btn, width=1).as_markup()
 enter_or_create_keyboard = InlineKeyboardMarkup(inline_keyboard=([enter_btn], [create_btn])) # Клавиатура Входа/создания БД
 in_db_keyboard = InlineKeyboardMarkup(inline_keyboard=([add_product_btn], [del_product_btn], [show_products_btn], [over_3_days_btn], [exit_DB_btn], [del_improper_products_btn], [calculation_btn])) # Клавиатура кнопок взаимодействия с БД
 enter_create_or_cancel_keyboard = InlineKeyboardMarkup(inline_keyboard=([enter_btn], [create_btn], [cancel_btn])) # Клавиатура создания/входа или выхода из БД
-# pagination = InlineKeyboardMarkup(inline_keyboard=([[backward_btn], [forward_btn]], [enter_main_menu_btn]))
 pagination_keyboard = InlineKeyboardBuilder().row(backward_btn, forward_btn, enter_main_menu_btn, width=2).as_markup()

@@ -77,6 +77,8 @@ async def connect(typeActions=None, user_id=None, shop_id=None, downloaded_file=
         cursor = await cursor.fetchone()
         info_products = await conn.execute("SELECT * FROM products WHERE shop_id = (?)", (str(cursor[0]), ))
         info_products = await info_products.fetchall()
+        if not info_products:
+            return False
         result = []
         res = []
         count = 1
@@ -104,7 +106,8 @@ async def connect(typeActions=None, user_id=None, shop_id=None, downloaded_file=
     if typeActions == 'add_product_TA':
         cursor = await conn.execute('SELECT shop_id FROM users WHERE user_id = (?)', (user_id,))
         cursor = await cursor.fetchone()
-        async with aiofiles.open(f'shops/{str(cursor[0])}/{cod_product}.jpg', 'wb') as file:
+        print(cursor[0])
+        async with aiofiles.open(f'shops/{cursor[0]}/{cod_product}.jpg', 'wb') as file:
             await file.write(downloaded_file.getvalue())
         await conn.execute('INSERT INTO products (shop_id, cod, data, name_product) VALUES (?, ?, ?, ?)', (cursor[0], cod_product, data_product, name_product))
 
@@ -133,11 +136,14 @@ async def connect(typeActions=None, user_id=None, shop_id=None, downloaded_file=
                 os.remove(file_name)
     
     if typeActions == 'del_products_TA':
-        cursor = await conn.execute("SELECT cod FROM products WHERE cod = (?)", (cod_product, ))
+        cursor = await conn.execute("SELECT * FROM products WHERE cod = (?)", (cod_product, ))
         cursor = await cursor.fetchone()
         try:
-            await conn.execute("DELETE FROM products WHERE cod = (?)", (cursor[0], ))
-        except:
+            await conn.execute("DELETE FROM products WHERE cod = (?)", (cod_product, ))
+            file_name = f'shops/{str(cursor[0])}/{str(cursor[1])}.jpg'
+            os.remove(file_name)
+        except Exception as ex:
+            print(ex)
             return False
     await conn.commit()
     await conn.close() 
