@@ -10,12 +10,21 @@ import random, re
 # Переменные из других файлов 
 from main import PRIMARY_KEYS
 from main import bot
+# Логгирование
+import logging
 
+logger = logging.getLogger(__name__) 
+
+logger.setLevel(10)
+handler = logging.FileHandler('my_log.log', 'a', encoding='utf-8')
+formatter = logging.Formatter('[{asctime}] #{levelname} {filename}:{lineno} - {message}', style='{')
+handler.setFormatter(formatter)
+logger.addHandler(handler)
 # Выбор элементов с неправильным форматом даты
-def select_improper_date(date):
-    pattern = re.compile(r'\d\d\.\d\d\.\d\d\d\d')
-    if pattern.search(date) is None:
-        return True
+# def select_improper_date(date):
+#     pattern = re.compile(r'\d\d\.\d\d\.\d\d\d\d')
+#     if pattern.search(date) is None:
+#         return True
 
 # Функция расчета срока годности
 def calculate_func(date_create: str, num: int, form: str):
@@ -116,24 +125,25 @@ async def connect(typeActions=None, user_id=None, shop_id=None, downloaded_file=
         PRIMARY_KEYS = set()
 
     # Выбор товаров, срок годности которых уходит в течение 3 дней
-    if typeActions == 'enter_3_days_TA':
+    if typeActions in ['enter_3_days_TA', 'enter_15_days']:
         cursor = await conn.execute("SELECT shop_id FROM users WHERE user_id = (?)", (user_id, ))
         cursor = await cursor.fetchone()
         fit_products = await conn.execute('SELECT * FROM products WHERE shop_id = (?)', (cursor[0], ))
         fit_products = await fit_products.fetchall()
-        return [i for i in fit_products if select_3_days(i[2]) <= 3]
+
+        return [i for i in fit_products if select_3_days(i[2]) <= (3 if typeActions == 'enter_3_days_TA' else 15)]
     
     # Удаление товаров, с неподходящей датой 
-    if typeActions == 'del_improper_products_TA': 
-        cursor = await conn.execute("SELECT shop_id FROM users WHERE user_id = (?)", (user_id, ))
-        cursor = await cursor.fetchone()
-        cursor = await conn.execute('SELECT * FROM products WHERE shop_id = (?)', (cursor[0], ))
-        cursor = await cursor.fetchall()
-        for i in cursor:
-            if select_improper_date(i[2]):
-                await conn.execute('DELETE FROM products WHERE data = (?)', (i[2], ))
-                file_name = f'shops/{str(i[0])}/{str(i[1])}.jpg'
-                os.remove(file_name)
+    # if typeActions == 'del_improper_products_TA': 
+    #     cursor = await conn.execute("SELECT shop_id FROM users WHERE user_id = (?)", (user_id, ))
+    #     cursor = await cursor.fetchone()
+    #     cursor = await conn.execute('SELECT * FROM products WHERE shop_id = (?)', (cursor[0], ))
+    #     cursor = await cursor.fetchall()
+    #     for i in cursor:
+    #         if select_improper_date(i[2]):
+    #             await conn.execute('DELETE FROM products WHERE data = (?)', (i[2], ))
+    #             file_name = f'shops/{str(i[0])}/{str(i[1])}.jpg'
+    #             os.remove(file_name)
     
     if typeActions == 'del_products_TA':
         cursor = await conn.execute("SELECT * FROM products WHERE cod = (?)", (cod_product, ))
@@ -145,6 +155,22 @@ async def connect(typeActions=None, user_id=None, shop_id=None, downloaded_file=
         except Exception as ex:
             print(ex)
             return False
+        
+    if typeActions == 'send_overduo_message_TA':
+        cursor = await conn.execute('SELECT shop_id, user_id FROM users')
+        user_shop_dict = {}
+        for user, shop in await cursor.fetchall():
+            user_shop_dict[shop] = user_shop_dict.get(shop, []).append(user)
+        cursor = await conn.execute('SELECT * FROM products')
+        cursor = await cursor.fetchall()
+        for data in cursor:
+            if select_3_days(data[2]) <= 3:
+                try:
+                    for user in user_shop_dict[data[0]]:
+                        bot.send_message(chat_id=user, text=f'Сегодня сдох: {data[3]}\nКод продукта: {str(data[1])}')
+                except Exception as ex:
+                    logging.error(f'Ошибка в полуавтоматической отправке сообщения о Истекших сроках у продукта: {ex}')
+
     await conn.commit()
     await conn.close() 
 

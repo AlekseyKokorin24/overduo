@@ -35,7 +35,7 @@ async def clear_state(message: Message, state: FSMContext):
 # Запуск бота в дефолтном состоянии
 @router.message(CommandStart(), StateFilter(default_state))
 async def process_start_bot(message: Message):
-    await message.answer(text=f'<b>{message.from_user.first_name}</b>, привет.\n\nЗдесь ты можешь хранить информацию о товарах:\n-Срок годности\n-Фото\n-Код-фрагмент\n-Название товара\n\nНо для начала нужно войти или создать БД', reply_markup=enter_or_create_keyboard)
+    await message.answer(text=f'✨<b>{message.from_user.first_name}</b>✨, привет.\n\nЗдесь ты можешь хранить информацию о товарах:<b>\n-Срок годности\n-Фото\n-Код-фрагмент\n-Название товара\n</b>\nНо для начала нужно <b>войти</b> или <b>создать базу магазина</b>', reply_markup=enter_or_create_keyboard)
     await bot.delete_message(chat_id=message.chat.id, message_id=message.message_id - 1)
     logger.info(f'Пользователь {message.from_user.first_name, message.from_user.last_name} запустил бота')
 
@@ -174,7 +174,7 @@ async def show_products(callback: CallbackQuery):
 #             user_db[callback.from_user.id]['page'] += 1
 #         else:
 #             await callback.message.answer('lol')
-#     except:
+#     except: send_message
 #         user_db[callback.from_user.id]['page'] = 1
 #         await callback.message.edit_text(user_db[callback.from_user.id][1], reply_markup=pagination_keyboard)
 
@@ -201,9 +201,12 @@ async def process_pagination(callback: CallbackQuery):
 async def enter_main_menu_btn(callback: CallbackQuery):
     await callback.message.edit_text('<b>Продолжим</b>', reply_markup=in_db_keyboard)
 # Показывает товары, у которых срок годности выходит в течение 3 дней
-@router.callback_query(StateFilter(FSM_FORM.stateBeingInDB), F.data == 'button_3_daysCD')
+@router.callback_query(StateFilter(FSM_FORM.stateBeingInDB), F.data.in_(['3_daysCD, 15_daysCD']))
 async def overduo_3_days(callback: CallbackQuery):
-    fit_date = await connect(typeActions='enter_3_days_TA', user_id=callback.from_user.id)
+    if callback.data == '3_daysCD':
+        fit_date = await connect(typeActions='enter_3_days_TA', user_id=callback.from_user.id)
+    elif callback.data == '15_daysCD':
+        fit_date = await connect(typeActions='enter_15_days_TA', user_id=callback.from_user.id)
     # await bot.delete_message(chat_id=message.chat.id, message_id=message.message_id - 1)
     if fit_date:
         for i in fit_date:
@@ -213,11 +216,11 @@ async def overduo_3_days(callback: CallbackQuery):
     else:
         await callback.message.edit_text(text="<b>Нет подходящих дат</b>", reply_markup=in_db_keyboard)
 
-@router.callback_query(StateFilter(FSM_FORM.stateBeingInDB), F.data == 'del_improper_productsCD')
-async def del_improper_products(callback: CallbackQuery, state: FSMContext):
-    await connect(typeActions='del_improper_products_TA', user_id=callback.from_user.id)
-    await callback.message.edit_text(text='\n<b>Все лишние файлы удалены</b>\n', reply_markup=in_db_keyboard)
-    await state.set_state(FSM_FORM.stateBeingInDB)
+# @router.callback_query(StateFilter(FSM_FORM.stateBeingInDB), F.data == 'del_improper_productsCD')
+# async def del_improper_products(callback: CallbackQuery, state: FSMContext):
+#     await connect(typeActions='del_improper_products_TA', user_id=callback.from_user.id)
+#     await callback.message.edit_text(text='\n<b>Все лишние файлы удалены</b>\n', reply_markup=in_db_keyboard)
+#     await state.set_state(FSM_FORM.stateBeingInDB)
 
 # Функция расчета срока годности
 @router.callback_query(F.data == 'calculationCD', StateFilter(FSM_FORM.stateBeingInDB))

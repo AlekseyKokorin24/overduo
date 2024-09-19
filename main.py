@@ -52,7 +52,7 @@ async def main():
     dp.startup.register(set_main_menu)
     await dp.start_polling(bot) 
     logger.info('start polling')
-
+    
 if __name__ == '__main__':
     logger.info('start polling')
     asyncio.run(main())
